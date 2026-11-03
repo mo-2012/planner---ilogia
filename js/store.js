@@ -24,15 +24,20 @@ let scope = 'anon';
 let state = blank();
 const listeners = new Set();
 
+function normalize(obj) {
+  const b = blank(), s = { ...b, ...(obj || {}) };
+  s.settings = { ...b.settings, ...(s.settings || {}) };
+  s.settings.pomodoro = { ...b.settings.pomodoro, ...(s.settings.pomodoro || {}) };
+  return s;
+}
 function load() {
   try {
     const raw = localStorage.getItem(KEY(scope));
-    state = raw ? { ...blank(), ...JSON.parse(raw) } : blank();
-    state.settings = { ...blank().settings, ...(state.settings || {}) };
-    state.settings.pomodoro = { ...blank().settings.pomodoro, ...(state.settings.pomodoro || {}) };
+    state = raw ? normalize(JSON.parse(raw)) : blank();
   } catch { state = blank(); }
 }
-function persist() { localStorage.setItem(KEY(scope), JSON.stringify(state)); }
+let syncHook = null;   // بيتركّب من sync.js لما المستخدم يكون مسجّل دخول
+function persist(silent) { localStorage.setItem(KEY(scope), JSON.stringify(state)); if (!silent && syncHook) syncHook(); }
 
 export const store = {
   setScope(s) { scope = s || 'anon'; load(); emit(); },
@@ -40,7 +45,10 @@ export const store = {
   get state() { return state; },
   get settings() { return state.settings; },
   on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-  update(mut) { mut(state); persist(); emit(); },
+  update(mut, opts) { mut(state); persist(opts && opts.silent); emit(); },
+  setSyncHook(fn) { syncHook = fn || null; },
+  // استبدال الحالة ببيانات جاية من السيرفر (بدون ما نرجّع نرفعها)
+  replaceState(next) { state = normalize(next); persist(true); emit(); },
   // helpers
   subject(id) { return state.subjects.find(s => s.id === id); },
   subjectName(id) { return this.subject(id)?.name || '—'; },

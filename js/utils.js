@@ -1,5 +1,5 @@
 // iLogia Planner — utilities: dates, formatting, DOM helpers, modal, toast
-export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+export const uid = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];

@@ -7,6 +7,7 @@ import { t, getLang } from './i18n.js';
 
 let currentUser = null;
 let authService = null;
+let syncMod = null, syncToasted = false, syncErrToasted = false;
 
 async function getAuth() {
   if (!authService) {
@@ -32,6 +33,23 @@ function setUser(user) {
   currentUser = user || null;
   store.setScope(user ? user.id : 'anon');
   if (user && wasAnon) toast(`${t('loggedAs')}: ${user.email}`, 'ok');
+  startOrStopSync(user);
+}
+
+// مزامنة اختيارية مع planner_* — لو الجداول مش موجودة التطبيق يفضل محلي بدون أي رسالة خطأ
+function startOrStopSync(user) {
+  if (!user) { if (syncMod) syncMod.stopSync(); return; }
+  import('./sync.js').then((m) => {
+    if (!syncMod) {
+      syncMod = m;
+      m.sync.on((s) => {
+        const ar = getLang() === 'ar';
+        if (s === 'synced' && !syncToasted) { syncToasted = true; toast(ar ? 'تمت مزامنة بياناتك مع حسابك' : 'Your data is synced with your account', 'ok'); }
+        else if (s === 'error' && !syncErrToasted) { syncErrToasted = true; toast(ar ? 'تعذرت المزامنة الآن — بياناتك محفوظة محليًا وهنعيد المحاولة' : 'Sync failed — your data is saved locally, will retry', 'err'); }
+      });
+    }
+    m.startSync(user);
+  }).catch((e) => console.warn('[planner] sync unavailable:', e));
 }
 
 export const getUser = () => currentUser;
@@ -66,5 +84,6 @@ export function loginDialog() {
 
 export async function logout() {
   try { const auth = await getAuth(); await auth.logout(); } catch { /* local mode */ }
+  if (syncMod) syncMod.stopSync();
   store.setScope('anon');
 }
